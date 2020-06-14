@@ -28,8 +28,14 @@ namespace VoikkoNan {
         Nan::SetAccessor(tpl->PrototypeTemplate(), Nan::New("isHyphenator").ToLocalChecked(), IsHyphenator);
         Nan::SetAccessor(tpl->PrototypeTemplate(), Nan::New("isGrammarChecker").ToLocalChecked(), IsGrammarChecker);
 
-        constructor.Reset(tpl->GetFunction());
-        exports->Set(Nan::New("Dictionary").ToLocalChecked(), tpl->GetFunction());
+        v8::Local<v8::Context> context = exports->CreationContext();
+        
+        constructor.Reset(tpl->GetFunction(context).ToLocalChecked());
+        exports->Set(context,
+               Nan::New("Dictionary").ToLocalChecked(),
+               tpl->GetFunction(context).ToLocalChecked());
+        // constructor.Reset(tpl->GetFunction());
+        // exports->Set(Nan::New("Dictionary").ToLocalChecked(), tpl->GetFunction());
     }
 
     Dictionary::Dictionary(
@@ -91,8 +97,8 @@ namespace VoikkoNan {
             path = Nan::To<String>(info[0]).ToLocalChecked();
         }
 
-        char* path_cstr = new char[path->Utf8Length() + 1];
-        path->WriteUtf8(path_cstr);
+        char* path_cstr = new char[path->Utf8Length(info.GetIsolate()) + 1];
+        path->WriteUtf8(info.GetIsolate(), path_cstr);
         voikko_dict** voikkoDicts = voikko_list_dicts(path_cstr);
 
         char** spellers = voikkoListSupportedSpellingLanguages(path_cstr);

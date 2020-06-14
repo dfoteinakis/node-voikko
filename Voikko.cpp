@@ -73,9 +73,13 @@ namespace VoikkoNan
         Nan::SetAccessor(tpl->PrototypeTemplate(),
                          Nan::New("CacheSize").ToLocalChecked(),
                          CacheSize, CacheSize);
-
-        constructor.Reset(tpl->GetFunction());
-        exports->Set(Nan::New("Voikko").ToLocalChecked(), tpl->GetFunction());
+        v8::Local<v8::Context> context = exports->CreationContext();
+        // constructor.Reset(tpl->GetFunction());
+        // exports->Set(Nan::New("Voikko").ToLocalChecked(), tpl->GetFunction());
+        constructor.Reset(tpl->GetFunction(context).ToLocalChecked());
+        exports->Set(context,
+               Nan::New("Voikko").ToLocalChecked(),
+               tpl->GetFunction(context).ToLocalChecked());
     }
 
     Voikko::Voikko(const char *lang, const char *path)
@@ -101,14 +105,15 @@ namespace VoikkoNan
     }
 
     void Voikko::New(const FunctionCallbackInfo<Value> &info) {
+
         if (info.IsConstructCall()) {
             Local<String> langstr = Nan::To<String>(info[0]).ToLocalChecked();
-            char* lang_cstr = new char[langstr->Utf8Length() + 1];
-            langstr->WriteUtf8(lang_cstr);
+            char* lang_cstr = new char[langstr->Utf8Length(info.GetIsolate()) + 1];
+            langstr->WriteUtf8(info.GetIsolate(), lang_cstr);
 
             Local<String> pathstr = Nan::To<String>(info[1]).ToLocalChecked();
-            char* path_cstr = new char[pathstr->Utf8Length() + 1];
-            pathstr->WriteUtf8(path_cstr);
+            char* path_cstr = new char[pathstr->Utf8Length(info.GetIsolate()) + 1];
+            pathstr->WriteUtf8(info.GetIsolate(), path_cstr);
 
             Voikko *obj = new Voikko(lang_cstr, path_cstr);
             delete[] lang_cstr;
@@ -162,24 +167,25 @@ namespace VoikkoNan
         output[i] = '\0';
     }
 
-    static inline wchar_t* v8StringToUTF32(const Local<String>& str) {
+    static inline wchar_t* v8StringToUTF32(Isolate *isolate, const Local<String>& str) {
         wchar_t* UTF32_buff = new wchar_t[str->Length() + 1];
 
         if (sizeof(uint16_t) != sizeof(wchar_t)) {
             uint16_t *UTF16_buff = new uint16_t[str->Length() + 1];
-            str->Write(UTF16_buff);
+            str->Write(isolate, UTF16_buff);
             utf16_to_utf32(UTF16_buff, UTF32_buff);
             delete[] UTF16_buff;
         } else {
-            str->Write(reinterpret_cast<uint16_t*>(UTF32_buff));
+            str->Write(isolate, reinterpret_cast<uint16_t*>(UTF32_buff));
         }
 
         return UTF32_buff;
     }
 
     void Voikko::CheckUTF16(const FunctionCallbackInfo<Value> &info) {
+        Local<v8::Context> context = info.GetIsolate()->GetEnteredContext();
         Voikko* obj = ObjectWrap::Unwrap<Voikko>(info.Holder());
-        wchar_t* UTF32_buff = v8StringToUTF32(info[0]->ToString());
+        wchar_t* UTF32_buff = v8StringToUTF32(info.GetIsolate(), info[0]->ToString(context).ToLocalChecked());
         int result = voikkoSpellUcs4(obj->handle, UTF32_buff);
         delete[] UTF32_buff;
 
@@ -187,8 +193,9 @@ namespace VoikkoNan
     }
 
     void Voikko::SuggestionsForUTF16(const FunctionCallbackInfo<Value> &info) {
+        Local<v8::Context> context = info.GetIsolate()->GetEnteredContext();
         Voikko* obj = ObjectWrap::Unwrap<Voikko>(info.Holder());
-        wchar_t* UTF32_buff = v8StringToUTF32(info[0]->ToString());
+        wchar_t* UTF32_buff = v8StringToUTF32(info.GetIsolate(), info[0]->ToString(context).ToLocalChecked());
         wchar_t** results = voikkoSuggestUcs4(obj->handle, UTF32_buff);
         delete[] UTF32_buff;
 
@@ -205,7 +212,8 @@ namespace VoikkoNan
 
     void Voikko::HyphenateUTF16(const FunctionCallbackInfo<Value> &info) {
         Voikko* obj = ObjectWrap::Unwrap<Voikko>(info.Holder());
-        wchar_t* UTF32_buff = v8StringToUTF32(info[0]->ToString());
+        Local<v8::Context> context = info.GetIsolate()->GetEnteredContext();
+        wchar_t* UTF32_buff = v8StringToUTF32(info.GetIsolate(), info[0]->ToString(context).ToLocalChecked());
         char* mask = voikkoHyphenateUcs4(obj->handle, UTF32_buff);
         delete[] UTF32_buff;
 
@@ -218,8 +226,10 @@ namespace VoikkoNan
     }
 
     void Voikko::AnalyseUTF16(const FunctionCallbackInfo<Value> &info) {
+        Local<v8::Context> context = info.GetIsolate()->GetEnteredContext();
+        // Voikko* obj = ObjectWrap::Unwrap<Voikko>(info.Holder(context));
         Voikko* obj = ObjectWrap::Unwrap<Voikko>(info.Holder());
-        wchar_t* UTF32_buff = v8StringToUTF32(info[0]->ToString());
+        wchar_t* UTF32_buff = v8StringToUTF32(info.GetIsolate(), info[0]->ToString(context).ToLocalChecked());
         voikko_mor_analysis** analyses = voikkoAnalyzeWordUcs4(obj->handle, UTF32_buff);
         delete[] UTF32_buff;
 
